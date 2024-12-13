@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Barcodes</title>
+    <style>
+        .barcode-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .barcode-wrapper {
+            text-align: center;
+        }
+        .barcode {
+            width: 80%;
+            height: auto;
+        }
+        .barcode-number {
+            margin-top: -5px;
+            font-size: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #delete-button {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        .print-button { 
+          margin-top: 10px; 
+          padding: 10px 10px; 
+          font-size: 14px; 
+          cursor: pointer; 
+        }
+    </style>
+</head>
+<body>
+    
+    <div>
+        <label for="file-input">Insira o bloco de dados:</label>
+        <input type="file" id="file-input" accept=".txt" />
+        <button id="delete-button">Delete</button>
+        <button class="print-button" onclick="printPage()">Imprimir</button>
+    </div>
+    <div id="barcode-container" class="barcode-container"></div>
+
+    <script> function printPage() { window.print(); } </script>
+
+    <script>
+        console.log("JavaScript Loaded");
+
+        document.getElementById("file-input").addEventListener("change", function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const lines = e.target.result.split(/\r?\n/).map(line => line.trim()).filter(line => line.length === 12);
+                console.log("File lines:", lines);
+                const container = document.getElementById("barcode-container");
+                container.innerHTML = "";
+
+                lines.forEach((line, index) => {
+                    const barcodeUrl = `https://free-barcode.com/BarcodeOnline/barcode.asp?bc1=${line}&bc2=17&bc3=3.5&bc4=1.2&bc5=1&bc6=1&bc7=Arial&bc8=15&bc9=1`;
+                    const wrapper = document.createElement("div");
+                    wrapper.className = "barcode-wrapper";
+
+                    const img = document.createElement("img");
+                    img.src = barcodeUrl;
+                    img.className = "barcode";
+
+                    const number = document.createElement("div");
+                    number.textContent = line;
+                    number.className = "barcode-number";
+
+                    wrapper.appendChild(img);
+                    container.appendChild(wrapper);
+                });
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById("delete-button").addEventListener("click", function() {
+            document.getElementById("file-input").value = "";
+            document.getElementById("barcode-container").innerHTML = "";
+            console.log("File input cleared and barcodes removed");
+        });
+    </script>
+</body>
+</html>
