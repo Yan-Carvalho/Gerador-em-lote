@@ -94,7 +94,7 @@
 
 
 
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -103,21 +103,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
-        .barcode-container {
-            text-align: center;
-            margin-top: 20px;
-        }
-        .barcode {
-            width: 80%;
-            height: auto;
-        }
-        #generate-button, #download-all-button {
-            margin-top: 10px;
-            margin-bottom: 10px;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-        }
         #loading-overlay {
             position: fixed;
             top: 0;
@@ -144,8 +129,6 @@
         <button id="generate-button">Gerar Códigos de Barras</button>
         <button id="download-all-button">Baixar Todos os Códigos de Barras</button>
     </div>
-    <div id="barcode-container" class="barcode-container"></div>
-
     <div id="loading-overlay">
         <div id="loading-message">
             <p id="current-download">Iniciando download...</p>
@@ -155,64 +138,61 @@
     </div>
 
     <script>
-        function generateBarcodes(fileInput, onComplete) {
+        async function generateAndDownloadBarcodes(fileInput) {
             const reader = new FileReader();
-            reader.onload = function(event) {
+            reader.onload = async function(event) {
                 const text = event.target.result;
                 const lines = text.split('\n').map(line => line.trim()).filter(line => line.length === 12); // Filtra linhas com 12 dígitos
-                const container = document.getElementById("barcode-container");
-                container.innerHTML = ''; // Limpa o contêiner para exibir os códigos de barras
+                const batchSize = 10;
 
-                lines.forEach((barcodeInput, index) => {
-                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                    svg.setAttribute("id", `barcode-${index}`);
-                    svg.setAttribute("data-number", barcodeInput); // Armazena o número de referência
-                    container.appendChild(svg);
+                for (let i = 0; i < lines.length; i += batchSize) {
+                    const batch = lines.slice(i, i + batchSize);
+                    await Promise.all(batch.map((barcodeInput, index) => downloadBarcode(barcodeInput, index + i)));
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Atraso de 1 segundo entre os lotes
+                }
 
-                    try {
-                        JsBarcode(`#barcode-${index}`, barcodeInput, {
-                            format: "ITF",
-                            displayValue: true,
-                            fontSize: 20,
-                            font: "Arial", // Definindo uma fonte diferente para evitar zeros cortados
-                            width: 2,
-                            height: 100
-                        });
-                    } catch (error) {
-                        console.error("Erro ao gerar código de barras:", error);
-                    }
-                });
-
-                if (onComplete) onComplete(lines.length);
+                document.getElementById("completion-message").innerText = "Download concluído!";
+                document.getElementById("back-button").style.display = "block";
             };
             reader.readAsText(fileInput);
         }
 
-        function downloadBarcode(index, svg, onComplete) {
-            const barcodeNumber = svg.getAttribute("data-number");
-            const canvas = document.createElement("canvas");
-            const ctx = canvas.getContext("2d");
-            const svgData = new XMLSerializer().serializeToString(svg);
-            const img = new Image();
+        function downloadBarcode(barcodeInput, index) {
+            return new Promise((resolve, reject) => {
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                JsBarcode(svg, barcodeInput, {
+                    format: "ITF",
+                    displayValue: true,
+                    fontSize: 20,
+                    font: "Arial", // Definindo uma fonte diferente para evitar zeros cortados
+                    width: 2,
+                    height: 100
+                });
 
-            img.onload = function() {
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                canvas.toBlob(function(blob) {
-                    saveAs(blob, `${barcodeNumber}.png`);
-                    if (onComplete) onComplete();
-                }, "image/png");
-            };
+                const svgData = new XMLSerializer().serializeToString(svg);
+                const img = new Image();
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
 
-            img.onerror = function() {
-                console.error(`Erro ao carregar imagem: ${barcodeNumber}`);
-                if (onComplete) onComplete();
-            };
+                img.onload = function() {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob(function(blob) {
+                        saveAs(blob, `${barcodeInput}.png`);
+                        resolve();
+                    }, "image/png");
+                };
 
-            const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-            const url = URL.createObjectURL(svgBlob);
-            img.src = url;
+                img.onerror = function() {
+                    console.error(`Erro ao carregar imagem: ${barcodeInput}`);
+                    resolve(); // Não rejeita a promessa em caso de erro para continuar com os demais downloads
+                };
+
+                const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+                const url = URL.createObjectURL(svgBlob);
+                img.src = url;
+            });
         }
 
         function backToMainScreen() {
@@ -224,7 +204,7 @@
         document.getElementById("generate-button").addEventListener("click", function() {
             const fileInput = document.getElementById("file-input").files[0];
             if (fileInput) {
-                generateBarcodes(fileInput);
+                generateAndDownloadBarcodes(fileInput);
             } else {
                 alert("Por favor, carregue um arquivo de texto.");
             }
@@ -235,44 +215,10 @@
             if (fileInput) {
                 document.getElementById("loading-overlay").style.display = "flex";
                 document.getElementById("current-download").innerText = "Iniciando download...";
-
-                generateBarcodes(fileInput, function(totalLines) {
-                    const svgs = document.querySelectorAll("svg");
-                    const batchSize = 10;
-                    let batchStart = 0;
-
-                    function downloadNextBatch() {
-                        if (batchStart < totalLines) {
-                            let batchEnd = Math.min(batchStart + batchSize, totalLines);
-                            // document.getElementById("current-download").innerText = `Preparando lote: ${batchStart + 1} a ${batchEnd}`;
-                            document.getElementById("current-download").innerText = `Preparando lote: ${batchEnd + 1} a ${totalLines}`;
-                            
-                            for (let i = batchStart; i < batchEnd; i++) {
-                                downloadBarcode(i, svgs[i], function() {
-                                    if (i === batchEnd - 1) {
-                                        setTimeout(downloadNextBatch, 1000); // Atraso de 1 segundo entre cada lote de 10 downloads
-                                    }
-                                });
-                            }
-                            
-                            batchStart = batchEnd;
-                            if (batchStart >= totalLines) {
-                                document.getElementById("completion-message").innerText = "Download concluído!";
-                                document.getElementById("back-button").style.display = "block";
-                            }
-                        }
-                    }
-
-                    downloadNextBatch();
-                });
+                generateAndDownloadBarcodes(fileInput);
             } else {
                 alert("Por favor, carregue um arquivo de texto.");
             }
-        });
-
-        document.getElementById("delete-button").addEventListener("click", function() {
-            document.getElementById("file-input").value = "";
-            document.getElementById("barcode-container").innerHTML = "";
         });
     </script>
 </body>
