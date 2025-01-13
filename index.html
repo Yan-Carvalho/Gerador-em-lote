@@ -238,7 +238,7 @@
 
                 generateBarcodes(fileInput, function(totalLines) {
                     const svgs = document.querySelectorAll("svg");
-                    const batchSize = 10;
+                    const batchSize = 20;
                     let batchStart = 0;
 
                     function downloadNextBatch() {
@@ -249,7 +249,7 @@
                             for (let i = batchStart; i < batchEnd; i++) {
                                 downloadBarcode(i, svgs[i], function() {
                                     if (i === batchEnd - 1) {
-                                        setTimeout(downloadNextBatch, 500); // Atraso de 1 segundo entre cada lote de 10 downloads
+                                        setTimeout(downloadNextBatch, 1000); // Atraso de 1 segundo entre cada lote de 10 downloads
                                     }
                                 });
                             }
