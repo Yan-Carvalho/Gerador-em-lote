@@ -120,14 +120,20 @@
         #loading-message {
             text-align: center;
         }
+        #generate-button {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div>
         <label for="file-input">Carregar arquivo de texto (.txt):</label>
         <input type="file" id="file-input" accept=".txt" />
-        <button id="generate-button">Gerar Códigos de Barras</button>
-        <button id="download-all-button">Baixar Todos os Códigos de Barras</button>
+        <button id="generate-button">Baixar códigos de barras</button>
     </div>
     <div id="loading-overlay">
         <div id="loading-message">
