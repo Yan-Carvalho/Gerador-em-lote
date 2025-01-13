@@ -148,7 +148,7 @@
                 for (let i = 0; i < lines.length; i += batchSize) {
                     const batch = lines.slice(i, i + batchSize);
                     await Promise.all(batch.map((barcodeInput, index) => downloadBarcode(barcodeInput, index + i)));
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Atraso de 1 segundo entre os lotes
+                    await new Promise(resolve => setTimeout(resolve, 1100)); // Atraso de 1.1 segundo entre os lotes
                 }
 
                 document.getElementById("completion-message").innerText = "Download concluído!";
