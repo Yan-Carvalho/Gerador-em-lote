@@ -238,7 +238,7 @@
 
                 generateBarcodes(fileInput, function(totalLines) {
                     const svgs = document.querySelectorAll("svg");
-                    const batchSize = 10;
+                    const batchSize = 50;
                     let batchStart = 0;
 
                     function downloadNextBatch() {
