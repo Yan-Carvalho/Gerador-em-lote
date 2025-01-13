@@ -144,11 +144,19 @@
                 const text = event.target.result;
                 const lines = text.split('\n').map(line => line.trim()).filter(line => line.length === 12); // Filtra linhas com 12 dígitos
                 const batchSize = 10;
+                const pauseInterval = 300;
 
                 for (let i = 0; i < lines.length; i += batchSize) {
                     const batch = lines.slice(i, i + batchSize);
                     await Promise.all(batch.map((barcodeInput, index) => downloadBarcode(barcodeInput, index + i)));
-                    await new Promise(resolve => setTimeout(resolve, 1100)); // Atraso de 1.1 segundo entre os lotes
+
+                    if ((i + batchSize) % pauseInterval === 0) {
+                        document.getElementById("current-download").innerText = `Aguardando... Pausa de 10 segundos para processar`;
+                        await new Promise(resolve => setTimeout(resolve, 10000)); // Pausa de 10 segundos a cada 300 imagens
+                        document.getElementById("current-download").innerText = `Retomando download...`;
+                    } else {
+                        await new Promise(resolve => setTimeout(resolve, 1100)); // Atraso de 1 segundo entre os lotes
+                    }
                 }
 
                 document.getElementById("completion-message").innerText = "Download concluído!";
@@ -223,3 +231,4 @@
     </script>
 </body>
 </html>
+
