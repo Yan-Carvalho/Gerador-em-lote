@@ -238,13 +238,14 @@
 
                 generateBarcodes(fileInput, function(totalLines) {
                     const svgs = document.querySelectorAll("svg");
-                    const batchSize = 12;
+                    const batchSize = 10;
                     let batchStart = 0;
 
                     function downloadNextBatch() {
                         if (batchStart < totalLines) {
                             let batchEnd = Math.min(batchStart + batchSize, totalLines);
-                            document.getElementById("current-download").innerText = `Preparando lote: ${batchStart + 1} a ${batchEnd}`;
+                            // document.getElementById("current-download").innerText = `Preparando lote: ${batchStart + 1} a ${batchEnd}`;
+                            document.getElementById("current-download").innerText = `Preparando lote: ${batchEnd + 1} a ${totalLines}`;
                             
                             for (let i = batchStart; i < batchEnd; i++) {
                                 downloadBarcode(i, svgs[i], function() {
