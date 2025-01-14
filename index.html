@@ -103,69 +103,158 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.2.2/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        #generate-button, #download-all-button {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 20px;
+            z-index: 1000;
+        }
+        #loading-message {
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
     <div>
         <label for="file-input">Carregar arquivo de texto (.txt):</label>
         <input type="file" id="file-input" accept=".txt" />
-        <button id="generate-button">Gerar e Baixar Códigos de Barras</button>
+        <button id="generate-button">Gerar Códigos de Barras</button>
+        <button id="download-all-button">Baixar Todos os Códigos de Barras</button>
+    </div>
+
+    <div id="loading-overlay">
+        <div id="loading-message">
+            <p id="current-download">Iniciando download...</p>
+            <p id="completion-message"></p>
+            <button id="back-button" style="display: none;" onclick="backToMainScreen()">Voltar</button>
+        </div>
     </div>
 
     <script>
-        async function generateAndDownloadBarcodes(fileInput) {
+        function generateBarcodes(fileInput, onComplete) {
             const reader = new FileReader();
-            reader.onload = async function(event) {
+            reader.onload = function(event) {
                 const text = event.target.result;
                 const lines = text.split('\n').map(line => line.trim()).filter(line => line.length === 12); // Filtra linhas com 12 dígitos
-                const zip = new JSZip();
 
-                for (const [index, barcodeInput] of lines.entries()) {
+                const barcodes = lines.map((barcodeInput, index) => {
                     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                     JsBarcode(svg, barcodeInput, {
                         format: "ITF",
                         displayValue: true,
                         fontSize: 20,
-                        font: "Arial",
+                        font: "Arial", // Definindo uma fonte diferente para evitar zeros cortados
                         width: 2,
                         height: 100
                     });
-
-                    const canvas = document.createElement("canvas");
-                    const ctx = canvas.getContext("2d");
-                    const svgData = new XMLSerializer().serializeToString(svg);
-                    const img = new Image();
-
-                    await new Promise((resolve) => {
-                        img.onload = function() {
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            ctx.drawImage(img, 0, 0);
-                            const pngFile = canvas.toDataURL("image/png").split(",")[1];
-                            zip.file(`${barcodeInput}.png`, pngFile, { base64: true });
-                            resolve();
-                        };
-                        img.src = "data:image/svg+xml;base64," + btoa(svgData);
-                    });
-
-                    if ((index + 1) % 1000 === 0) {
-                        console.log(`Processado: ${index + 1} de ${lines.length}`);
-                    }
-                }
-
-                zip.generateAsync({ type: "blob" }).then(function(content) {
-                    saveAs(content, "barcodes.zip");
+                    return {svg, barcodeInput};
                 });
+
+                if (onComplete) onComplete(barcodes);
             };
             reader.readAsText(fileInput);
+        }
+
+        async function downloadBarcodesBatch(batchStart, batchEnd, barcodes, onComplete) {
+            const zip = new JSZip();
+            const folderName = `barcodes-${batchStart + 1}-${Math.min(batchEnd, barcodes.length)}`;
+            const folder = zip.folder(folderName);
+
+            for (let i = batchStart; i < batchEnd && i < barcodes.length; i++) {
+                const { svg, barcodeInput } = barcodes[i];
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+                const svgData = new XMLSerializer().serializeToString(svg);
+                const img = new Image();
+
+                await new Promise((resolve) => {
+                    img.onload = function() {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        const pngFile = canvas.toDataURL("image/png").split(",")[1];
+                        folder.file(`${barcodeInput}.png`, pngFile, { base64: true });
+                        resolve();
+                    };
+                    img.src = "data:image/svg+xml;base64," + btoa(svgData);
+                });
+            }
+
+            zip.generateAsync({ type: "blob" }).then(function(content) {
+                saveAs(content, `${folderName}.zip`);
+                document.getElementById("current-download").innerText = `Baixando: ${folderName}.zip`;
+                if (onComplete) onComplete();
+            });
+        }
+
+        function backToMainScreen() {
+            document.getElementById("loading-overlay").style.display = "none";
+            document.getElementById("completion-message").innerText = "";
+            document.getElementById("back-button").style.display = "none";
         }
 
         document.getElementById("generate-button").addEventListener("click", function() {
             const fileInput = document.getElementById("file-input").files[0];
             if (fileInput) {
-                generateAndDownloadBarcodes(fileInput);
+                generateBarcodes(fileInput, function(barcodes) {
+                    console.log(`${barcodes.length} códigos de barras gerados.`);
+                });
             } else {
                 alert("Por favor, carregue um arquivo de texto.");
             }
+        });
+
+        document.getElementById("download-all-button").addEventListener("click", function() {
+            const fileInput = document.getElementById("file-input").files[0];
+            if (fileInput) {
+                document.getElementById("loading-overlay").style.display = "flex";
+                document.getElementById("current-download").innerText = "Iniciando download...";
+
+                generateBarcodes(fileInput, function(barcodes) {
+                    const batchSize = 2000;
+                    let batchStart = 0;
+
+                    function downloadNextBatch() {
+                        if (batchStart < barcodes.length) {
+                            let batchEnd = batchStart + batchSize;
+                            document.getElementById("current-download").innerText = `Preparando lote: ${batchStart + 1} a ${batchEnd}`;
+                            downloadBarcodesBatch(batchStart, batchEnd, barcodes, function() {
+                                batchStart = batchEnd;
+                                if (batchStart < barcodes.length) {
+                                    setTimeout(downloadNextBatch, 10000); // Atraso de 10 segundos entre cada download
+                                } else {
+                                    document.getElementById("completion-message").innerText = "Download concluído!";
+                                    document.getElementById("back-button").style.display = "block";
+                                }
+                            });
+                        }
+                    }
+
+                    downloadNextBatch();
+                });
+            } else {
+                alert("Por favor, carregue um arquivo de texto.");
+            }
+        });
+
+        document.getElementById("delete-button").addEventListener("click", function() {
+            document.getElementById("file-input").value = "";
         });
     </script>
 </body>
