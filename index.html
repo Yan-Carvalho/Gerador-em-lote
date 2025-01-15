@@ -730,10 +730,10 @@
 
         async function downloadBarcodesBatch(batchStart, batchEnd, onComplete) {
             const zip = new JSZip();
-            const folderName = `barcodes-${batchStart + 1}-${batchEnd}`;
+            const folderName = `barcodes-${batchStart + 1 + currentBatchStart}-${Math.min(batchEnd + currentBatchStart, totalLines)}`;
             const folder = zip.folder(folderName);
 
-            for (let i = 0; i < barcodes.length; i++) {
+            for (let i = batchStart; i < batchEnd && i < barcodes.length; i++) {
                 const { svg, barcodeInput } = barcodes[i];
                 const canvas = document.createElement("canvas");
                 const ctx = canvas.getContext("2d");
@@ -772,7 +772,7 @@
                 document.getElementById("download-all-button").disabled = true; // Desabilitar botão de download
 
                 function generateNextBatch() {
-                    if (currentBatchStart < totalLines) {
+                    if (currentBatchStart < fileInput.size) {
                         let batchEnd = currentBatchStart + batchSize;
                         generateBarcodesBatch(fileInput, currentBatchStart, batchEnd, function(generatedBarcodes, total) {
                             barcodes = generatedBarcodes;
@@ -789,10 +789,8 @@
                                 function downloadNextBatch() {
                                     if (downloadBatchStart < barcodes.length) {
                                         let downloadBatchEnd = downloadBatchStart + 2000;
-                                        let realStart = currentBatchStart + downloadBatchStart;
-                                        let realEnd = Math.min(realStart + 2000, currentBatchStart + barcodes.length);
-                                        document.getElementById("current-download").innerText = `Preparando lote: ${realStart + 1} a ${realEnd}`;
-                                        downloadBarcodesBatch(realStart, realEnd, function() {
+                                        document.getElementById("current-download").innerText = `Preparando lote: ${downloadBatchStart + 1 + currentBatchStart} a ${downloadBatchEnd + currentBatchStart}`;
+                                        downloadBarcodesBatch(downloadBatchStart, downloadBatchEnd, function() {
                                             downloadBatchStart = downloadBatchEnd;
                                             if (downloadBatchStart < barcodes.length) {
                                                 setTimeout(downloadNextBatch, 10000); // Atraso de 10 segundos entre cada download
