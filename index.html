@@ -315,6 +315,11 @@
     </div>
 
     <script>
+        let barcodes = [];
+        let totalLines = 0;
+        let currentBatchStart = 0;
+        const batchSize = 40000;
+
         function generateBarcodesBatch(fileInput, batchStart, batchEnd, onComplete) {
             const reader = new FileReader();
             reader.onload = function(event) {
@@ -322,7 +327,7 @@
                 const lines = text.split('\n').map(line => line.trim()).filter(line => line.length === 12); // Filtra linhas com 12 dígitos
                 const batchLines = lines.slice(batchStart, batchEnd);
 
-                const barcodes = batchLines.map((barcodeInput, index) => {
+                const generatedBarcodes = batchLines.map((barcodeInput, index) => {
                     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                     JsBarcode(svg, barcodeInput, {
                         format: "ITF",
@@ -332,17 +337,17 @@
                         width: 2,
                         height: 100
                     });
-                    return {svg, barcodeInput};
+                    return { svg, barcodeInput };
                 });
 
-                if (onComplete) onComplete(barcodes, lines.length);
+                if (onComplete) onComplete(generatedBarcodes, lines.length);
             };
             reader.readAsText(fileInput);
         }
 
-        async function downloadBarcodesBatch(batchStart, batchEnd, barcodes, onComplete) {
+        async function downloadBarcodesBatch(batchStart, batchEnd, onComplete) {
             const zip = new JSZip();
-            const folderName = `barcodes-${batchStart + 1}-${Math.min(batchEnd, barcodes.length)}`;
+            const folderName = `barcodes-${batchStart + 1}-${Math.min(batchEnd, totalLines)}`;
             const folder = zip.folder(folderName);
 
             for (let i = batchStart; i < batchEnd && i < barcodes.length; i++) {
@@ -382,41 +387,46 @@
             const fileInput = document.getElementById("file-input").files[0];
             if (fileInput) {
                 document.getElementById("download-all-button").disabled = true; // Desabilitar botão de download
-                const batchSize = 40000;
-                let batchStart = 0;
 
                 function generateNextBatch() {
-                    if (batchStart < fileInput.size) {
-                        let batchEnd = batchStart + batchSize;
-                        generateBarcodesBatch(fileInput, batchStart, batchEnd, function(barcodes, totalLines) {
+                    if (currentBatchStart < fileInput.size) {
+                        let batchEnd = currentBatchStart + batchSize;
+                        generateBarcodesBatch(fileInput, currentBatchStart, batchEnd, function(generatedBarcodes, total) {
+                            barcodes = generatedBarcodes;
+                            totalLines = total;
                             console.log(`${barcodes.length} códigos de barras gerados.`);
                             document.getElementById("download-all-button").disabled = false; // Habilitar botão de download
-                            if (batchStart + batchSize >= totalLines) {
-                                document.getElementById("download-all-button").addEventListener("click", function() {
-                                    let downloadBatchStart = 0;
 
-                                    function downloadNextBatch() {
-                                        if (downloadBatchStart < barcodes.length) {
-                                            let downloadBatchEnd = downloadBatchStart + 2000;
-                                            document.getElementById("current-download").innerText = `Preparando lote: ${downloadBatchStart + 1} a ${downloadBatchEnd}`;
-                                            downloadBarcodesBatch(downloadBatchStart, downloadBatchEnd, barcodes, function() {
-                                                downloadBatchStart = downloadBatchEnd;
-                                                if (downloadBatchStart < barcodes.length) {
-                                                    setTimeout(downloadNextBatch, 10000); // Atraso de 10 segundos entre cada download
-                                                } else {
-                                                    document.getElementById("completion-message").innerText = "Download concluído!";
-                                                    document.getElementById("back-button").style.display = "block";
+                            document.getElementById("download-all-button").addEventListener("click", function() {
+                                document.getElementById("loading-overlay").style.display = "flex";
+                                document.getElementById("current-download").innerText = "Iniciando download...";
+
+                                let downloadBatchStart = 0;
+
+                                function downloadNextBatch() {
+                                    if (downloadBatchStart < barcodes.length) {
+                                        let downloadBatchEnd = downloadBatchStart + 2000;
+                                        document.getElementById("current-download").innerText = `Preparando lote: ${downloadBatchStart + 1} a ${downloadBatchEnd}`;
+                                        downloadBarcodesBatch(downloadBatchStart, downloadBatchEnd, function() {
+                                            downloadBatchStart = downloadBatchEnd;
+                                            if (downloadBatchStart < barcodes.length) {
+                                                setTimeout(downloadNextBatch, 10000); // Atraso de 10 segundos entre cada download
+                                            } else {
+                                                document.getElementById("completion-message").innerText = "Download concluído!";
+                                                document.getElementById("back-button").style.display = "block";
+                                                currentBatchStart += batchSize;
+                                                if (currentBatchStart < totalLines) {
+                                                    barcodes = [];
+                                                    document.getElementById("download-all-button").disabled = true; // Desabilitar botão de download novamente
+                                                    generateNextBatch();
                                                 }
-                                            });
-                                        }
+                                            }
+                                        });
                                     }
+                                }
 
-                                    downloadNextBatch();
-                                });
-                            } else {
-                                batchStart = batchEnd;
-                                setTimeout(generateNextBatch, 10000); // Atraso de 10 segundos entre cada geração de lote
-                            }
+                                downloadNextBatch();
+                            });
                         });
                     }
                 }
